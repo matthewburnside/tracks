@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+<meta charset="UTF-8">
+<style type="text/css">
+    html {
+        height: 100%
+    }
+    body {
+        height: 100%;
+        margin: 0;
+        padding: 0
+    }
+    #map_canvas {
+        height: 100%;
+    }
+    #map_panel {
+        position: absolute;
+        bottom: 0px;
+        left: 0px;
+        z-index: 10;
+        border: 1px solid #777;
+        background: #fff;
+        height: 40%;
+        width: 30%;
+    }
+</style>
+<script type="text/javascript" src='http://maps.googleapis.com/maps/api/js?key=AIzaSyDc3LDO-rPImnz9e4c2KwviMBBRonz9vlk&sensor=false&libraries=drawing,geometry'></script>
+<script type="text/javascript" src='https://www.google.com/jsapi'></script>
+<script type="text/javascript">
+
+    var map = null;
+    var chart = null;
+    var elevationService = null;
+    var mousemarker = null;
+    var latlngs = [];
+    var polyline = null;
+    var elevations = null;
+    var units = 'miles';
+    var SAMPLES = 256;
+
+    google.load("visualization", "1", {packages:["columnchart"]});
+
+    function init() {
+        var usa = new google.maps.LatLng(37.0625,-95.677068);
+        var m_opts = {
+            center: usa,
+            zoom: 4,
+            mapTypeId: google.maps.MapTypeId.ROADMAP
+        };
+        map = new google.maps.Map(document.getElementById("map_canvas"),m_opts);
+        google.maps.event.addListener(map, 'click', add_segment);
+
+        var t_opts = {
+            strokeColor: '#000000',
+            strokeOpacity: .75,
+            strokeWeight: 3,
+            editable: true
+        }
+        track = new google.maps.Polyline(t_opts);
+        track.setMap(map);
+
+        elevator = new google.maps.ElevationService();
+        chart = new google.visualization.ColumnChart(document.getElementById('chart'));
+    }
+
+    function add_segment(event) {
+        track.getPath().push(event.latLng);
+        latlngs.push(event.latLng);
+        update_all();
+    }
+
+    function update_elevation() {
+        if (latlngs.length <= 1)
+            return;
+
+        elevator.getElevationAlongPath({
+            path: latlngs,
+            samples: SAMPLES
+        }, plot_elevation);
+    }
+
+
+    function plot_elevation(results) {
+        elevations = results;
+
+        var path = [];
+        for (var i = 0; i < results.length; i++) {
+            path.push(elevations[i].location);
+        }
+
+        if (polyline) {
+            polyline.setMap(null);
+        }
+
+        polyline = new google.maps.Polyline({
+            path: path,
+            strokeColor: "#000000",
+            map: map});
+
+        var data = new google.visualization.DataTable();
+        data.addColumn('string', 'Sample');
+        data.addColumn('number', 'Elevation');
+        for (var i = 0; i < results.length; i++) {
+            data.addRow(['', elevations[i].elevation]);
+        }
+
+        document.getElementById('chart').style.display = 'block';
+        chart.draw(data, {
+            legend: 'none',
+            titleY: 'Elevation (m)',
+            focusBorderColor: '#00ff00'
+        });
+    }
+
+    function update_distance() {
+        var dist=google.maps.geometry.spherical.computeLength(track.getPath()); 
+        document.getElementById("length").innerHTML = unit(dist).toFixed(2);
+    }
+
+    function update_all() {
+        update_distance();
+        update_elevation();
+    }
+
+    function unit(dist) {
+        document.getElementById("unit").innerHTML = units;
+        switch (units) {
+        case "miles": return (dist * 0.000621371192);
+        case "km": return (dist * 0.001);
+        case "ft": return (dist * 3.2808399);
+        }
+    }
+
+    function set_units(u) {
+        units = u;
+        update_distance();
+    }
+</script>
+
+
+<title>Tracks</title>
+</head>
+<body onload="init()">
+<div id="map_canvas" style="width:100%; height:100%"> </div>
+<div id="map_panel">
+<a href="javascript:undo()">
+<span style="text-decoration:underline">Undo</span>
+</a> &nbsp;
+
+<a href="javascript:clearPath()">
+<span style="text-decoration:underline">Clear</span>
+</a> &nbsp;
+
+<a href="javascript:permalink()">
+<img src="http://maps.google.com/mapfiles/link_icon.gif"/>
+<span style="text-decoration:underline">Link to this page</span>
+</a>
+<br /><br />
+
+<div style="width:200px;margin:0 0 15px 0">
+Click the map to mark points on your path.
+</div>
+
+<span style="font-weight: bold">Path length</span> &nbsp;
+<span style="font-size: 10pt;">[
+<a href="javascript:set_units('miles')">miles</a> |
+<a href="javascript:set_units('ft')">ft</a> |
+<a href="javascript:set_units('km')">km</a>
+]</span><br />
+&nbsp; <span id="length">0.00</span> <span id="unit">miles</span><br />
+
+<div id="chart" style="width: 100%; height:50%;"></div>
+
+<div id="error"></div>
+</div>
+</body>
+</html>
