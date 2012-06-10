@@ -29,16 +29,15 @@
 <script type="text/javascript" src='http://maps.googleapis.com/maps/api/js?key=AIzaSyDc3LDO-rPImnz9e4c2KwviMBBRonz9vlk&sensor=false&libraries=drawing,geometry'></script>
 <script type="text/javascript" src='https://www.google.com/jsapi'></script>
 <script type="text/javascript">
-
     var map = null;
     var chart = null;
     var elevationService = null;
     var mousemarker = null;
     var latlngs = [];
-    var polyline = null;
     var elevations = null;
     var units = 'miles';
     var SAMPLES = 256;
+    var track = null;
 
     google.load("visualization", "1", {packages:["columnchart"]});
 
@@ -50,19 +49,16 @@
             mapTypeId: google.maps.MapTypeId.ROADMAP
         };
         map = new google.maps.Map(document.getElementById("map_canvas"),m_opts);
-        google.maps.event.addListener(map, 'click', add_segment);
-
-        var t_opts = {
-            strokeColor: '#000000',
-            strokeOpacity: .75,
-            strokeWeight: 3,
-            editable: true
-        }
-        track = new google.maps.Polyline(t_opts);
-        track.setMap(map);
-
         elevator = new google.maps.ElevationService();
         chart = new google.visualization.ColumnChart(document.getElementById('chart'));
+        track = new google.maps.Polyline({
+            strokeColor: "#000000",
+            strokeOpacity: .7,
+            strokeWeight: 3,
+            map: map
+        });
+
+        google.maps.event.addListener(map, 'click', add_segment);
     }
 
     function add_segment(event) {
@@ -71,33 +67,14 @@
         update_all();
     }
 
-    function update_elevation() {
-        if (latlngs.length <= 1)
-            return;
-
-        elevator.getElevationAlongPath({
-            path: latlngs,
-            samples: SAMPLES
-        }, plot_elevation);
+    function remove_segment(event) {
+        track.getPath().pop();
+        latlngs.pop();
+        update_all();
     }
-
 
     function plot_elevation(results) {
         elevations = results;
-
-        var path = [];
-        for (var i = 0; i < results.length; i++) {
-            path.push(elevations[i].location);
-        }
-
-        if (polyline) {
-            polyline.setMap(null);
-        }
-
-        polyline = new google.maps.Polyline({
-            path: path,
-            strokeColor: "#000000",
-            map: map});
 
         var data = new google.visualization.DataTable();
         data.addColumn('string', 'Sample');
@@ -114,14 +91,28 @@
         });
     }
 
+    function update_elevation() {
+        if (latlngs == [] || latlngs.length < 2)
+            return;
+
+        elevator.getElevationAlongPath({ 'path': latlngs,
+                                          'samples': 256 },
+                                        plot_elevation);
+    }
+
     function update_distance() {
+        if (track == []) {
+            dist = 0.0;
+            return;
+        }
+
         var dist=google.maps.geometry.spherical.computeLength(track.getPath()); 
         document.getElementById("length").innerHTML = unit(dist).toFixed(2);
     }
 
     function update_all() {
-        update_distance();
         update_elevation();
+        update_distance();
     }
 
     function unit(dist) {
@@ -137,6 +128,16 @@
         units = u;
         update_distance();
     }
+
+    function undo() {
+        remove_segment();
+    }
+
+    function clear_path() {
+        latlngs = [];
+        track = [];
+        update_all();
+    }
 </script>
 
 
@@ -149,7 +150,7 @@
 <span style="text-decoration:underline">Undo</span>
 </a> &nbsp;
 
-<a href="javascript:clearPath()">
+<a href="javascript:clear_path()">
 <span style="text-decoration:underline">Clear</span>
 </a> &nbsp;
 
