@@ -31,46 +31,102 @@
 <script type="text/javascript">
     var map = null;
     var chart = null;
-    var elevationService = null;
-    var mousemarker = null;
-    var latlngs = [];
-    var elevations = null;
+    var elevator = null;
+    var track = [];
+    var segments = [];
     var units = 'miles';
     var SAMPLES = 256;
-    var track = null;
+    var start, end, handle, marker;
 
-    google.load("visualization", "1", {packages:["columnchart"]});
+    google.load("visualization", "1", {packages:["corechart"]});
 
     function init() {
         var usa = new google.maps.LatLng(37.0625,-95.677068);
         var m_opts = {
             center: usa,
             zoom: 4,
-            mapTypeId: google.maps.MapTypeId.ROADMAP
+            mapTypeId: google.maps.MapTypeId.ROADMAP,
+            draggableCursor: 'pointer'
         };
         map = new google.maps.Map(document.getElementById("map_canvas"),m_opts);
         elevator = new google.maps.ElevationService();
-        chart = new google.visualization.ColumnChart(document.getElementById('chart'));
-        track = new google.maps.Polyline({
-            strokeColor: "#000000",
-            strokeOpacity: .7,
-            strokeWeight: 3,
-            map: map
-        });
+        chart = new google.visualization.LineChart(document.getElementById('chart'));
+
+        handle_img = new google.maps.MarkerImage("http://maps.gstatic.com/mapfiles/markers2/dd-via.png", null, null, new google.maps.Point(5, 5));
+
 
         google.maps.event.addListener(map, 'click', add_segment);
+//        google.visualization.events.addListener(chart, 'onmouseover',
+//            function(event) {
+//                if (marker == null) {
+//                    marker = new google.maps.Marker({
+//                        position: elevations[event.row].location,
+//                        map: map,
+//                        icon: "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
+//                    });
+//                } else {
+//                    marker.setPosition(elevations[event.row].location);
+//                }
+//        });
+
     }
 
     function add_segment(event) {
-        track.getPath().push(event.latLng);
-        latlngs.push(event.latLng);
+        var segment;
+        var handle;
+
+        handle = new google.maps.Marker({
+            raiseOnDrag: false,
+            position: event.latLng,
+            draggable: true,
+            map: map,
+            icon: handle_img
+            });
+        google.maps.event.addListener(handle, 'drag', drag(track.length));
+
+        if (track.length > 0) {
+            segment = new google.maps.Polyline({
+                strokeColor: "#000000",
+                strokeOpacity: .7,
+                strokeWeight: 3,
+                map: map,
+                path: [track[track.length - 1].getPosition(), event.latLng]
+            });
+            segments.push(segment);
+        }
+
+        track.push(handle);
         update_all();
     }
 
+    function drag(index) {
+        return function () {
+            var neighbor = null;
+            var seg = null;
+
+            // if has left neighbor
+            if (index > 0) {
+                seg = segments[index - 1];
+                seg.setPath([track[index - 1].getPosition(),
+                    track[index].getPosition()]);
+            }
+
+            // if has right neighbor
+            if (index < track.length - 1) {
+                seg = segments[index];
+                seg.setPath([track[index].getPosition(),
+                    track[index + 1].getPosition()]);
+
+            }
+            update_distance();
+            return;
+        }
+    }
+
     function remove_segment(event) {
-        track.getPath().pop();
-        latlngs.pop();
-        update_all();
+//        track.getPath().pop();
+//        path.pop();
+//        update_all();
     }
 
     function plot_elevation(results) {
@@ -92,26 +148,21 @@
     }
 
     function update_elevation() {
-        if (latlngs == [] || latlngs.length < 2)
-            return;
-
-        elevator.getElevationAlongPath({ 'path': latlngs,
-                                          'samples': 256 },
-                                        plot_elevation);
+        if (path.length > 1)
+            elevator.getElevationAlongPath({ 'path': path, 'samples': 256 },
+                    plot_elevation);
     }
 
     function update_distance() {
-        if (track == []) {
-            dist = 0.0;
-            return;
-        }
+//        if (track == [])
+//            return;
 
-        var dist=google.maps.geometry.spherical.computeLength(track.getPath()); 
-        document.getElementById("length").innerHTML = unit(dist).toFixed(2);
+//        var dist=google.maps.geometry.spherical.computeLength(track.getPath()); 
+//        document.getElementById("length").innerHTML = unit(dist).toFixed(2);
     }
 
     function update_all() {
-        update_elevation();
+//        update_elevation();
         update_distance();
     }
 
@@ -134,8 +185,23 @@
     }
 
     function clear_path() {
-        latlngs = [];
-        track = [];
+        track.getPath().clear();
+        path = [];
+
+        var data = new google.visualization.DataTable();
+        data.addColumn('string', 'Sample');
+        data.addColumn('number', 'Elevation');
+//        for (var i = 0; i < results.length; i++) {
+//            data.addRow(['', elevations[i].elevation]);
+//        }
+
+        document.getElementById('chart').style.display = 'block';
+        chart.draw(data, {
+            legend: 'none',
+            titleY: 'Elevation (m)',
+            focusBorderColor: '#00ff00'
+        });
+
         update_all();
     }
 </script>
@@ -172,7 +238,7 @@ Click the map to mark points on your path.
 ]</span><br />
 &nbsp; <span id="length">0.00</span> <span id="unit">miles</span><br />
 
-<div id="chart" style="width: 100%; height:50%;"></div>
+<div id="chart" style="width: 100%; height:65%;"></div>
 
 <div id="error"></div>
 </div>
