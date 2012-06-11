@@ -104,32 +104,38 @@
             var neighbor = null;
             var seg = null;
 
-            // if has left neighbor
-            if (index > 0) {
+            if (index > 0) { // if index has a left neighbor
                 seg = segments[index - 1];
-                seg.setPath([track[index - 1].getPosition(),
+                segments[index - 1].setPath([track[index - 1].getPosition(),
                     track[index].getPosition()]);
             }
 
-            // if has right neighbor
-            if (index < track.length - 1) {
+            if (index < track.length - 1) { // if index has a right neighbor
                 seg = segments[index];
-                seg.setPath([track[index].getPosition(),
+                segments[index].setPath([track[index].getPosition(),
                     track[index + 1].getPosition()]);
-
             }
-            update_distance();
+            update_all();
             return;
         }
     }
 
     function remove_segment(event) {
-//        track.getPath().pop();
-//        path.pop();
-//        update_all();
+        del = track.pop();
+        del.setMap(null);
+        del = null;
+
+        del = segments.pop();
+        del.setMap(null);
+        del = null;
+
+        update_all();
     }
 
     function plot_elevation(results) {
+        if (results == null)
+            return;
+
         elevations = results;
 
         var data = new google.visualization.DataTable();
@@ -148,21 +154,26 @@
     }
 
     function update_elevation() {
-        if (path.length > 1)
-            elevator.getElevationAlongPath({ 'path': path, 'samples': 256 },
+        if (track.length > 1)
+            elevator.getElevationAlongPath({ 'path': get_latLngs(),
+                                            'samples': 256 },
                     plot_elevation);
     }
 
-    function update_distance() {
-//        if (track == [])
-//            return;
+    function get_latLngs() {
+        return track.map(function (handle) { return handle.getPosition(); });
+    }
 
-//        var dist=google.maps.geometry.spherical.computeLength(track.getPath()); 
-//        document.getElementById("length").innerHTML = unit(dist).toFixed(2);
+    function update_distance() {
+        if (track == [])
+            return;
+
+        var dist = google.maps.geometry.spherical.computeLength(get_latLngs()); 
+        document.getElementById("length").innerHTML = unit(dist).toFixed(2);
     }
 
     function update_all() {
-//        update_elevation();
+        update_elevation();
         update_distance();
     }
 
@@ -185,15 +196,24 @@
     }
 
     function clear_path() {
-        track.getPath().clear();
-        path = [];
+        var i;
+
+        for (i = 0; i < track.length; i++) {
+            track[i].setMap(null);
+            track[i] = null;
+        }
+
+        for (i = 0; i < segments.length; i++) {
+            segments[i].setMap(null);
+            segments[i] = null;
+        }
+
+        track = [];
+        segments = [];
 
         var data = new google.visualization.DataTable();
         data.addColumn('string', 'Sample');
         data.addColumn('number', 'Elevation');
-//        for (var i = 0; i < results.length; i++) {
-//            data.addRow(['', elevations[i].elevation]);
-//        }
 
         document.getElementById('chart').style.display = 'block';
         chart.draw(data, {
