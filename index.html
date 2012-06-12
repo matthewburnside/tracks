@@ -112,25 +112,16 @@ function init() {
         mapTypeId: google.maps.MapTypeId.ROADMAP,
         draggableCursor: 'pointer'
     };
-    map = new google.maps.Map(document.getElementById("map_canvas"),m_opts);
+    map = new google.maps.Map(document.getElementById("map_canvas"), m_opts);
     elevator = new google.maps.ElevationService();
-    chart = new google.visualization.LineChart(document.getElementById('chart'));
+    chart =new google.visualization.LineChart(document.getElementById('chart'));
     marker = new google.maps.Marker({
-					visible: false,
-                    map: map,
-                    icon: marker_img 
-                });
+			visible: false,
+			map: map,
+			icon: marker_img 
+		});
 
-    var data = new google.visualization.DataTable();
-    data.addColumn('string', 'Sample');
-    data.addColumn('number', 'Elevation');
-    document.getElementById('chart').style.display = 'block';
-    chart.draw(data, {
-        legend: 'none',
-        titleY: 'Elevation (ft)',
-        colors: ['black'],
-        vAxis: {minValue: 0, maxValue: 5000}
-    });
+	clear_elevation();
     google.maps.event.addListener(map, 'click', function (event) {
             add_segment(event);
 			update_all()
@@ -200,9 +191,6 @@ function dragend() {
 	update_elevation();
 }
 
-function clear_marker() {
-	marker.setVisible(false);
-}
 
 function remove_segment(event) {
     del = track.pop();
@@ -246,13 +234,20 @@ function get_latLngs() {
     return track.map(function (handle) { return handle.getPosition(); });
 }
 
-function update_elevation() {
-    if (track.length > 1)
-        elevator.getElevationAlongPath({ 'path': get_latLngs(),
-                                        'samples': 256 },
-                plot_elevation);
+function update_all() {
+    update_elevation();
+    update_distance();
 }
 
+function update_elevation() {
+    if (track.length > 1)
+        elevator.getElevationAlongPath({
+			'path': get_latLngs(),
+			'samples': 256
+		}, plot_elevation);
+	else
+		clear_elevation();
+}
 
 function update_distance() {
     if (track == [])
@@ -261,10 +256,6 @@ function update_distance() {
     document.getElementById("length").innerHTML = unit(dist).toFixed(2);
 }
 
-function update_all() {
-    update_elevation();
-    update_distance();
-}
 
 function unit(dist) {
     document.getElementById("unit").innerHTML = units;
@@ -284,35 +275,6 @@ function undo() {
     remove_segment();
 }
 
-function clear_path() {
-    var i;
-
-    for (i = 0; i < track.length; i++) {
-        track[i].setMap(null);
-        track[i] = null;
-    }
-
-    for (i = 0; i < segments.length; i++) {
-        segments[i].setMap(null);
-        segments[i] = null;
-    }
-
-    track = [];
-    segments = [];
-
-    var data = new google.visualization.DataTable();
-    data.addColumn('string', 'Sample');
-    data.addColumn('number', 'Elevation');
-    document.getElementById('chart').style.display = 'block';
-    chart.draw(data, {
-        legend: 'none',
-        titleY: 'Elevation (ft)',
-        colors: ['black'],
-        vAxis: {minValue: 0, maxValue: 5000}
-    });
-
-    update_all();
-}
 
 
 function permalink() {
@@ -391,6 +353,45 @@ function parse_url() {
 	update_all();
 }
 
+function clear_all() {
+	clear_track();
+	clear_elevation();
+	update_all();
+}
+
+function clear_marker() {
+	marker.setVisible(false);
+}
+
+function clear_elevation() {
+    var data = new google.visualization.DataTable();
+    data.addColumn('string', 'Sample');
+    data.addColumn('number', 'Elevation');
+    document.getElementById('chart').style.display = 'block';
+    chart.draw(data, {
+        legend: 'none',
+        titleY: 'Elevation (ft)',
+        colors: ['black'],
+        vAxis: {minValue: 0, maxValue: 5000}
+    });
+}
+
+function clear_track() {
+    var i;
+
+    for (i = 0; i < track.length; i++) {
+        track[i].setMap(null);
+        track[i] = null;
+    }
+
+    for (i = 0; i < segments.length; i++) {
+        segments[i].setMap(null);
+        segments[i] = null;
+    }
+
+    track = [];
+    segments = [];
+}
 
 
 </script>
@@ -407,7 +408,7 @@ function parse_url() {
 				<span style="text-decoration:underline">Undo</span>
 			</a> &nbsp;
 
-			<a href="javascript:clear_path()">
+			<a href="javascript:clear_all()">
 				<span style="text-decoration:underline">Clear</span>
 			</a> &nbsp;
 
