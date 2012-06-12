@@ -85,8 +85,8 @@ var elevator = null;
 var track = [];
 var segments = [];
 var units = 'miles';
-var SAMPLES = 256;
 var start_img, end_img, handle_img, marker_img;
+//var marker;
 var marker;
 
 var start_img = new google.maps.MarkerImage(
@@ -115,6 +115,11 @@ function init() {
     map = new google.maps.Map(document.getElementById("map_canvas"),m_opts);
     elevator = new google.maps.ElevationService();
     chart = new google.visualization.LineChart(document.getElementById('chart'));
+    marker = new google.maps.Marker({
+					visible: false,
+                    map: map,
+                    icon: marker_img 
+                });
 
     var data = new google.visualization.DataTable();
     data.addColumn('string', 'Sample');
@@ -133,16 +138,9 @@ function init() {
 
     google.visualization.events.addListener(chart, 'onmouseover',
         function(event) {
-            if (marker == null) {
-                marker = new google.maps.Marker({
-                    position: elevations[event.row].location,
-                    map: map,
-                    icon: marker_img 
-                });
-            } else {
-                marker.setPosition(elevations[event.row].location);
-            }
-    });
+			marker.setPosition(elevations[event.row].location);
+			marker.setVisible(true);
+		});
     parse_url();
 }
 
@@ -203,10 +201,7 @@ function dragend() {
 }
 
 function clear_marker() {
-    if (marker != null) {
-        marker.setMap(null);
-        marker = null;
-    }
+	marker.setVisible(false);
 }
 
 function remove_segment(event) {
