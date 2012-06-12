@@ -10,7 +10,10 @@
     body {
         height: 100%;
         margin: 0;
-        padding: 0
+        padding: 0;
+		border: 0;
+		font-family: sans-serif;
+		font-size: small;
     }
     #map_canvas {
         height: 100%;
@@ -21,316 +24,373 @@
         left: 0px;
         z-index: 10;
         border: 1px solid #777;
-        background: #fff;
-        height: 25%;
-        width: 50%;
+        background: white;
+        height: 240px;
+        width: 454px;
+		padding: 15px;
     }
     #map_controls {
-        width: 30%;
+        width: 50%;
         float: right;
-        margin: 15px 15px 15px 15px;
+		text-align: right;
     }
     #map_info {
         width: 50%;
         float: left;
-        margin: 15px 15px 15px 15px;
     }
+	#chart {
+		clear: both;
+	}
+	#share {
+		background: white;
+        border: 1px solid #777;
+		padding: 0px;
+		z-index: 10;
+		position: absolute;
+		top: 0;
+		left: 0;
+		display: none;
+		width: 320px;
+	}
+	#share_url {
+		margin: 0px 10px 10px 10px;
+		width: 90%;
+		clear: both;
+	}
+	#share_notes {
+		float: left;
+		margin: 10px;
+	}
+	#X {
+		padding: 0px;
+		margin: 0px 5px 0px 0px;
+		text-decoration: none;
+		float: right;
+	}
+	#x_link {
+		text-decoration: none;
+		color: #777;
+		font-family: sans-serif;
+		font-size: large;
+		text-align: right;
+	}
 </style>
 <script type="text/javascript" src='http://maps.googleapis.com/maps/api/js?key=AIzaSyDc3LDO-rPImnz9e4c2KwviMBBRonz9vlk&sensor=false&libraries=drawing,geometry'></script>
 <script type="text/javascript" src='https://www.google.com/jsapi'></script>
 <script type="text/javascript">
-    var map = null;
-    var chart = null;
-    var elevator = null;
-    var track = [];
-    var segments = [];
-    var units = 'miles';
-    var SAMPLES = 256;
-    var start_img, end_img, handle_img, marker_img;
-    var marker;
 
-    var start_img = new google.maps.MarkerImage(
-        "http://maps.google.com/mapfiles/dd-start.png",
-        null, null, new google.maps.Point(10, 34));
-    var end_img = new google.maps.MarkerImage(
-        "http://maps.google.com/mapfiles/dd-end.png",
-        null, null, new google.maps.Point(10, 34));
-    var handle_img = new google.maps.MarkerImage(
-        "http://maps.gstatic.com/mapfiles/markers2/dd-via.png",
-        null, null, new google.maps.Point(5, 5));
-    var marker_img = new google.maps.MarkerImage(
-        "http://labs.google.com/ridefinder/images/mm_20_white.png",
-        null, null, new google.maps.Point(6, 20));
+var map = null;
+var chart = null;
+var elevator = null;
+var track = [];
+var segments = [];
+var units = 'miles';
+var SAMPLES = 256;
+var start_img, end_img, handle_img, marker_img;
+var marker;
 
-    google.load("visualization", "1", {packages:["corechart"]});
+var start_img = new google.maps.MarkerImage(
+    "http://maps.google.com/mapfiles/dd-start.png",
+    null, null, new google.maps.Point(10, 34));
+var end_img = new google.maps.MarkerImage(
+    "http://maps.google.com/mapfiles/dd-end.png",
+    null, null, new google.maps.Point(10, 34));
+var handle_img = new google.maps.MarkerImage(
+    "http://maps.gstatic.com/mapfiles/markers2/dd-via.png",
+    null, null, new google.maps.Point(5, 5));
+var marker_img = new google.maps.MarkerImage(
+    "http://labs.google.com/ridefinder/images/mm_20_red.png",
+    null, null, new google.maps.Point(6, 20));
 
-    function init() {
-        var usa = new google.maps.LatLng(37.0625,-95.677068);
-        var m_opts = {
-            center: usa,
-            zoom: 4,
-            mapTypeId: google.maps.MapTypeId.ROADMAP,
-            draggableCursor: 'pointer'
-        };
-        map = new google.maps.Map(document.getElementById("map_canvas"),m_opts);
-        elevator = new google.maps.ElevationService();
-        chart = new google.visualization.LineChart(document.getElementById('chart'));
+google.load("visualization", "1", {packages:["corechart"]});
 
-        var data = new google.visualization.DataTable();
-        data.addColumn('string', 'Sample');
-        data.addColumn('number', 'Elevation');
-        document.getElementById('chart').style.display = 'block';
-        chart.draw(data, {
-            legend: 'none',
-            titleY: 'Elevation (ft)',
-            colors: ['black'],
-            vAxis: {minValue: 0, maxValue: 5000}
+function init() {
+    var usa = new google.maps.LatLng(37.0625,-95.677068);
+    var m_opts = {
+        center: usa,
+        zoom: 4,
+        mapTypeId: google.maps.MapTypeId.ROADMAP,
+        draggableCursor: 'pointer'
+    };
+    map = new google.maps.Map(document.getElementById("map_canvas"),m_opts);
+    elevator = new google.maps.ElevationService();
+    chart = new google.visualization.LineChart(document.getElementById('chart'));
+
+    var data = new google.visualization.DataTable();
+    data.addColumn('string', 'Sample');
+    data.addColumn('number', 'Elevation');
+    document.getElementById('chart').style.display = 'block';
+    chart.draw(data, {
+        legend: 'none',
+        titleY: 'Elevation (ft)',
+        colors: ['black'],
+        vAxis: {minValue: 0, maxValue: 5000}
+    });
+    google.maps.event.addListener(map, 'click', function (event) {
+            add_segment(event);
+			update_all()
         });
-        google.maps.event.addListener(map, 'click', function (event) {
-                add_segment(event); update_all()
-            });
 
-        google.visualization.events.addListener(chart, 'onmouseover',
-            function(event) {
-                if (marker == null) {
-                    marker = new google.maps.Marker({
-                        position: elevations[event.row].location,
-                        map: map,
-                        icon: marker_img 
-                    });
-                } else {
-                    marker.setPosition(elevations[event.row].location);
-                }
+    google.visualization.events.addListener(chart, 'onmouseover',
+        function(event) {
+            if (marker == null) {
+                marker = new google.maps.Marker({
+                    position: elevations[event.row].location,
+                    map: map,
+                    icon: marker_img 
+                });
+            } else {
+                marker.setPosition(elevations[event.row].location);
+            }
+    });
+    parse_url();
+}
+
+function add_segment(event) {
+    var segment;
+    var handle;
+
+    handle = new google.maps.Marker({
+        raiseOnDrag: false,
+        position: event.latLng,
+        draggable: true,
+        map: map,
+        icon: (track.length == 0 ? start_img : end_img)
         });
-        parse_url();
-    }
+    google.maps.event.addListener(handle, 'drag', drag(track.length));
 
-    function add_segment(event) {
-        var segment;
-        var handle;
-
-        handle = new google.maps.Marker({
-            raiseOnDrag: false,
-            position: event.latLng,
-            draggable: true,
+    if (track.length > 0) {
+        segment = new google.maps.Polyline({
+            strokeColor: "#000000",
+            strokeOpacity: .7,
+            strokeWeight: 3,
             map: map,
-            icon: (track.length == 0 ? start_img : end_img)
-            });
-        google.maps.event.addListener(handle, 'drag', drag(track.length));
-
-        if (track.length > 0) {
-            segment = new google.maps.Polyline({
-                strokeColor: "#000000",
-                strokeOpacity: .7,
-                strokeWeight: 3,
-                map: map,
-                path: [track[track.length - 1].getPosition(), event.latLng],
-            });
-            segments.push(segment);
-        }
-        if (track.length > 1)
-            track[track.length - 1].setIcon(handle_img);
-
-        track.push(handle);
-    }
-
-    function drag(index) {
-        return function () {
-            var neighbor = null;
-            var seg = null;
-
-            if (index > 0) { // if index has a left neighbor
-                seg = segments[index - 1];
-                segments[index - 1].setPath([track[index - 1].getPosition(),
-                    track[index].getPosition()]);
-            }
-
-            if (index < track.length - 1) { // if index has a right neighbor
-                seg = segments[index];
-                segments[index].setPath([track[index].getPosition(),
-                    track[index + 1].getPosition()]);
-            }
-            update_all();
-            return;
-        }
-    }
-
-    function clear_marker() {
-        if (marker != null) {
-            marker.setMap(null);
-            marker = null;
-        }
-    }
-
-    function remove_segment(event) {
-        del = track.pop();
-        del.setMap(null);
-        del = null;
-
-        del = segments.pop();
-        del.setMap(null);
-        del = null;
-
-        if (track.length > 1)
-            track[track.length - 1].setIcon(end_img);
-
-        update_all();
-    }
-
-    function plot_elevation(results) {
-        if (results == null)
-            return;
-
-        elevations = results;
-
-        var data = new google.visualization.DataTable();
-        data.addColumn('string', 'Sample');
-        data.addColumn('number', 'Elevation');
-        for (var i = 0; i < results.length; i++) {
-            data.addRow(['', 3.2808399 * elevations[i].elevation]);
-        }
-
-        document.getElementById('chart').style.display = 'block';
-        chart.draw(data, {
-            legend: 'none',
-            titleY: 'Elevation (ft)',
-            colors: ['#333333']
+            path: [track[track.length - 1].getPosition(), event.latLng],
+//            geodesic: true,
         });
+        segments.push(segment);
     }
+    if (track.length > 1)
+        track[track.length - 1].setIcon(handle_img);
 
-    function update_elevation() {
-        if (track.length > 1)
-            elevator.getElevationAlongPath({ 'path': get_latLngs(),
-                                            'samples': 256 },
-                    plot_elevation);
-    }
+    track.push(handle);
+}
 
-    function get_latLngs() {
-        return track.map(function (handle) { return handle.getPosition(); });
-    }
+function drag(index) {
+    return function () {
+        var neighbor = null;
+        var seg = null;
 
-    function update_distance() {
-        if (track == [])
-            return;
-
-        var dist = google.maps.geometry.spherical.computeLength(get_latLngs()); 
-        document.getElementById("length").innerHTML = unit(dist).toFixed(2);
-    }
-
-    function update_all() {
-        update_elevation();
-        update_distance();
-    }
-
-    function unit(dist) {
-        document.getElementById("unit").innerHTML = units;
-        switch (units) {
-        case "miles": return (dist * 0.000621371192);
-        case "km": return (dist * 0.001);
-        case "ft": return (dist * 3.2808399);
-        }
-    }
-
-    function set_units(u) {
-        units = u;
-        update_distance();
-    }
-
-    function undo() {
-        remove_segment();
-    }
-
-    function clear_path() {
-        var i;
-
-        for (i = 0; i < track.length; i++) {
-            track[i].setMap(null);
-            track[i] = null;
+        if (index > 0) { // if index has a left neighbor
+            seg = segments[index - 1];
+            segments[index - 1].setPath([track[index - 1].getPosition(),
+                track[index].getPosition()]);
         }
 
-        for (i = 0; i < segments.length; i++) {
-            segments[i].setMap(null);
-            segments[i] = null;
+        if (index < track.length - 1) { // if index has a right neighbor
+            seg = segments[index];
+            segments[index].setPath([track[index].getPosition(),
+                track[index + 1].getPosition()]);
         }
-
-        track = [];
-        segments = [];
-
-        var data = new google.visualization.DataTable();
-        data.addColumn('string', 'Sample');
-        data.addColumn('number', 'Elevation');
-        document.getElementById('chart').style.display = 'block';
-        chart.draw(data, {
-            legend: 'none',
-            titleY: 'Elevation (ft)',
-            colors: ['black'],
-            vAxis: {minValue: 0, maxValue: 5000}
-        });
-
         update_all();
+        return;
     }
+}
 
-
-    function permalink() {
-        var loc = location.href.split('?')[0];
-        var pathenc = google.maps.geometry.encoding.encodePath(get_latLngs());
-
-        location.href = loc + '?ll=' + map.getCenter().toUrlValue() +
-            '&z=' + escape(map.getZoom()) +
-            '&t=' + map.getMapTypeId()[0] +
-            (track.length > 0 ? '&path=' + escape(pathenc) : '');
+function clear_marker() {
+    if (marker != null) {
+        marker.setMap(null);
+        marker = null;
     }
+}
 
-    function parse_url() {
-        var url = location.href;
-        var args, params, equ, arr = [];
-        var j;
+function remove_segment(event) {
+    del = track.pop();
+    del.setMap(null);
+    del = null;
 
-        if (url.indexOf('?') == -1) // no arguments
-            return;
+    del = segments.pop();
+    del.setMap(null);
+    del = null;
 
-        args = url.split('?');
-        if (args[1].length > 0) {
-            params = args[1].split("&");
+    if (track.length > 1)
+        track[track.length - 1].setIcon(end_img);
 
-        for (i = 0; i < params.length; i++) {
-            equ = params[i].split("=");
-            switch (equ[0]) {
-            case 'll':
-                var vals = equ[1].split(',');
-                var ll = new google.maps.LatLng(parseFloat(unescape(vals[0])),
-                    parseFloat(unescape(vals[1])));
-                map.setCenter(ll);
-                break;
-            case 'z':
-                map.setZoom(parseInt(unescape(equ[1])));
-                break;
-            case 't':
-                switch (equ[1]) {
-                case 'h':
-                    map.setMapTypeId(google.maps.MapTypeId.HYBRID);break;
-                case 'm':
-                case 'r':
-                    map.setMapTypeId(google.maps.MapTypeId.ROADMAP); break;
-                case 'k':
-                case 's':
-                    map.setMapTypeId(google.maps.MapTypeId.SATELLITE); break;
-                case 't':
-                    map.setMapTypeId(google.maps.MapTypeId.TERRAIN); break;
-                }
-                break;
-            case 'path':
-                arr=google.maps.geometry.encoding.decodePath(unescape(equ[1]));
-                break;
-            }
-        }
-    }
-
-    for (j = 0; j < arr.length; j++) {
-        add_segment({latLng: arr[j]});
-    }
     update_all();
 }
+
+function plot_elevation(results) {
+    if (results == null)
+        return;
+
+    elevations = results;
+
+    var data = new google.visualization.DataTable();
+    data.addColumn('string', 'Sample');
+    data.addColumn('number', 'Elevation');
+    for (var i = 0; i < results.length; i++) {
+        data.addRow(['', 3.2808399 * elevations[i].elevation]);
+    }
+
+    document.getElementById('chart').style.display = 'block';
+    chart.draw(data, {
+        legend: 'none',
+        titleY: 'Elevation (ft)',
+        colors: ['#333333'],
+		height: 220,
+		chartArea: {width: 360},
+    });
+}
+
+function get_latLngs() {
+    return track.map(function (handle) { return handle.getPosition(); });
+}
+
+function update_elevation() {
+    if (track.length > 1)
+        elevator.getElevationAlongPath({ 'path': get_latLngs(),
+                                        'samples': 256 },
+                plot_elevation);
+}
+
+
+function update_distance() {
+    if (track == [])
+        return;
+    var dist = google.maps.geometry.spherical.computeLength(get_latLngs()); 
+    document.getElementById("length").innerHTML = unit(dist).toFixed(2);
+}
+
+function update_all() {
+    update_elevation();
+    update_distance();
+}
+
+function unit(dist) {
+    document.getElementById("unit").innerHTML = units;
+    switch (units) {
+    case "miles": return (dist * 0.000621371192);
+    case "km": return (dist * 0.001);
+    case "ft": return (dist * 3.2808399);
+    }
+}
+
+function set_units(u) {
+    units = u;
+    update_distance();
+}
+
+function undo() {
+    remove_segment();
+}
+
+function clear_path() {
+    var i;
+
+    for (i = 0; i < track.length; i++) {
+        track[i].setMap(null);
+        track[i] = null;
+    }
+
+    for (i = 0; i < segments.length; i++) {
+        segments[i].setMap(null);
+        segments[i] = null;
+    }
+
+    track = [];
+    segments = [];
+
+    var data = new google.visualization.DataTable();
+    data.addColumn('string', 'Sample');
+    data.addColumn('number', 'Elevation');
+    document.getElementById('chart').style.display = 'block';
+    chart.draw(data, {
+        legend: 'none',
+        titleY: 'Elevation (ft)',
+        colors: ['black'],
+        vAxis: {minValue: 0, maxValue: 5000}
+    });
+
+    update_all();
+}
+
+
+function permalink() {
+    var loc = location.href.split('?')[0];
+    var pathenc = google.maps.geometry.encoding.encodePath(get_latLngs());
+
+    document.getElementById("share_url").value =
+    	loc + '?ll=' + map.getCenter().toUrlValue() +
+        '&z=' + escape(map.getZoom()) +
+        '&t=' + map.getMapTypeId()[0] +
+        (track.length > 0 ? '&path=' + escape(pathenc) : '');
+
+	share_box = document.getElementById("share"); 
+	map_box = document.getElementById("map_panel"); 
+
+	share_box.style.display = "block";
+	share_box.style.top = map_box.offsetTop + "px";
+	share_box.style.left =(map_box.offsetLeft + map_box.offsetWidth) + "px";
+	document.getElementById("share_url").focus();
+	document.getElementById("share_url").select();
+}
+
+function close_share() {
+	document.getElementById("share").style.display = "none";
+}
+
+function parse_url() {
+    var url = location.href;
+    var args, params, equ, arr = [];
+    var j;
+
+    if (url.indexOf('?') == -1) // no arguments
+        return;
+
+    args = url.split('?');
+    if (args[1].length > 0) {
+        params = args[1].split("&");
+
+		for (i = 0; i < params.length; i++) {
+			equ = params[i].split("=");
+			switch (equ[0]) {
+			case 'll':
+				var vals = equ[1].split(',');
+				var ll=new google.maps.LatLng(parseFloat(unescape(vals[0])),
+					parseFloat(unescape(vals[1])));
+				map.setCenter(ll);
+				break;
+			case 'z':
+				map.setZoom(parseInt(unescape(equ[1])));
+				break;
+			case 't':
+				switch (equ[1]) {
+				case 'h':
+					map.setMapTypeId(google.maps.MapTypeId.HYBRID);break;
+				case 'm':
+				case 'r':
+					map.setMapTypeId(google.maps.MapTypeId.ROADMAP); break;
+				case 'k':
+				case 's':
+					map.setMapTypeId(google.maps.MapTypeId.SATELLITE);break;
+				case 't':
+					map.setMapTypeId(google.maps.MapTypeId.TERRAIN); break;
+				}
+				break;
+			case 'path':
+				arr =
+				 google.maps.geometry.encoding.decodePath(unescape(equ[1]));
+				break;
+			}
+		}
+	}
+
+	for (j = 0; j < arr.length; j++) {
+		add_segment({latLng: arr[j]});
+	}
+	update_all();
+}
+
 
 
 </script>
@@ -338,40 +398,49 @@
 
 <title>Tracks</title>
 </head>
-<body onload="init()">
-<div id="map_canvas" style="width:100%; height:100%"> </div>
+<body onload="init()" onresize="update_elevation()">
+	<div id="map_canvas" style="width:100%; height:100%"></div>
 
-<div id="map_panel">
+	<div id="map_panel">
+		<div id="map_controls">
+			<a href="javascript:undo()">
+				<span style="text-decoration:underline">Undo</span>
+			</a> &nbsp;
 
-<div id="map_controls">
-<a href="javascript:undo()">
-<span style="text-decoration:underline">Undo</span>
-</a> &nbsp;
+			<a href="javascript:clear_path()">
+				<span style="text-decoration:underline">Clear</span>
+			</a> &nbsp;
 
-<a href="javascript:clear_path()">
-<span style="text-decoration:underline">Clear</span>
-</a> &nbsp;
+			<a href="javascript:permalink()">
+				<span style="text-decoration:underline">Share</span>
+				<img src="http://maps.google.com/mapfiles/link_icon.gif"/>
+			</a>
+		</div>
 
-<a href="javascript:permalink()">
-<img src="http://maps.google.com/mapfiles/link_icon.gif"/>
-<span style="text-decoration:underline">Share</span>
-</a>
-</div>
+		<div id="map_info">
+			<span style="font-weight: bold">Path length</span>
+			<span>[
+				<a href="javascript:set_units('miles')">miles</a> |
+				<a href="javascript:set_units('ft')">ft</a> |
+				<a href="javascript:set_units('km')">km</a>
+			]</span><br />
+			&nbsp; <span id="length">0.00</span> <span id="unit">miles</span>
+		</div>
 
-<div id="map_info">
-<span style="font-weight: bold">Path length:</span> &nbsp;
-<span id="length">0.00</span> <span id="unit">miles</span>
-<span style="font-size: 10pt;">[
-<a href="javascript:set_units('miles')">miles</a> |
-<a href="javascript:set_units('ft')">ft</a> |
-<a href="javascript:set_units('km')">km</a>
-]</span><br />
-</div>
+		<div id="chart" onmouseout="clear_marker()"></div>
+		<div id="error"></div>
+	</div>
 
-<div id="chart" style="height: 65%; width: 100%" onmouseout="clear_marker()">
-</div>
+	<div id="share">
+		<div id="share_notes">Paste link in <b>email</b> or <b>IM</b>.</div>
+		<div id="X">
+		<a id="x_link" href="javascript:close_share()"
+			onmouseout="style.color='#777'"
+			onmouseover="style.color='#111'">x</a>
+		</div>
+		<input id="share_url" type="text" dir="rtl">
+	</div>
 
-<div id="error"></div>
-</div>
+
 </body>
 </html>
